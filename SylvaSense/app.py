@@ -23,72 +23,135 @@ REGIONS: dict[str, dict[str, Any]] = {
     "Western Ghats — Silent Valley, Kerala": {
         "bbox": [76.35, 11.02, 76.52, 11.18],
         "seed": 17,
-        "trees": 18420,
-        "canopy_pct": 78.4,
-        "agb": 212.6,
-        "carbon": 106.3,
-        "loss_pct": 3.1,
+        "trees": 1247,
+        "crown_area_ha": 68.4,
+        "canopy_pct": 74.8,
+        "mean_crown_m2": 54.9,
+        "agb": 184.6,
+        "carbon": 92.3,
+        "co2e": 338.5,
+        "loss_pct": 4.7,
+        "tree_delta": -82,
+        "risk": "MEDIUM",
+        "health": 87,
+        "health_status": "HEALTHY",
+        "ndvi_ind": 0.74,
+        "sar_stability": 0.81,
+        "trees_2024": 1329,
+        "trees_2025": 1288,
+        "trees_2026": 1247,
         "note": "Moist evergreen canopy with high NDVI contrast along ridges.",
     },
     "Sundarbans — West Bengal": {
         "bbox": [88.85, 21.72, 89.12, 21.95],
         "seed": 42,
-        "trees": 12110,
+        "trees": 1086,
+        "crown_area_ha": 51.2,
         "canopy_pct": 61.2,
+        "mean_crown_m2": 47.1,
         "agb": 148.0,
         "carbon": 74.0,
+        "co2e": 271.6,
         "loss_pct": 6.8,
+        "tree_delta": -94,
+        "risk": "HIGH",
+        "health": 72,
+        "health_status": "WATCH",
+        "ndvi_ind": 0.61,
+        "sar_stability": 0.68,
+        "trees_2024": 1210,
+        "trees_2025": 1140,
+        "trees_2026": 1086,
         "note": "Mangrove mosaic; tidal channels appear as low-backscatter corridors.",
     },
     "Nilgiri Biosphere — Tamil Nadu": {
         "bbox": [76.40, 11.22, 76.68, 11.48],
         "seed": 9,
-        "trees": 15680,
+        "trees": 1318,
+        "crown_area_ha": 64.1,
         "canopy_pct": 71.9,
+        "mean_crown_m2": 48.6,
         "agb": 188.4,
         "carbon": 94.2,
+        "co2e": 345.7,
         "loss_pct": 4.4,
+        "tree_delta": -71,
+        "risk": "MEDIUM",
+        "health": 84,
+        "health_status": "HEALTHY",
+        "ndvi_ind": 0.71,
+        "sar_stability": 0.79,
+        "trees_2024": 1412,
+        "trees_2025": 1360,
+        "trees_2026": 1318,
         "note": "Shola–grassland matrix with patchy canopy edges.",
     },
     "Kaziranga Buffer — Assam": {
         "bbox": [93.25, 26.48, 93.48, 26.68],
         "seed": 63,
-        "trees": 9800,
+        "trees": 942,
+        "crown_area_ha": 42.8,
         "canopy_pct": 54.6,
+        "mean_crown_m2": 45.4,
         "agb": 126.7,
         "carbon": 63.4,
+        "co2e": 232.7,
         "loss_pct": 8.2,
+        "tree_delta": -118,
+        "risk": "HIGH",
+        "health": 64,
+        "health_status": "STRESSED",
+        "ndvi_ind": 0.54,
+        "sar_stability": 0.62,
+        "trees_2024": 1124,
+        "trees_2025": 1028,
+        "trees_2026": 942,
         "note": "Floodplain woodland with seasonal disturbance signatures.",
     },
     "Satpura — Madhya Pradesh": {
         "bbox": [78.20, 22.35, 78.48, 22.58],
         "seed": 28,
-        "trees": 14250,
+        "trees": 1174,
+        "crown_area_ha": 58.9,
         "canopy_pct": 66.8,
+        "mean_crown_m2": 50.2,
         "agb": 164.1,
         "carbon": 82.1,
+        "co2e": 301.3,
         "loss_pct": 5.5,
+        "tree_delta": -88,
+        "risk": "MEDIUM",
+        "health": 78,
+        "health_status": "WATCH",
+        "ndvi_ind": 0.66,
+        "sar_stability": 0.74,
+        "trees_2024": 1290,
+        "trees_2025": 1232,
+        "trees_2026": 1174,
         "note": "Dry deciduous stand; SAR highlights structure in leaf-off patches.",
     },
 }
 
-MAP_H, MAP_W = 540, 860
+MAP_H, MAP_W = 560, 900
 ANALYSIS_STEPS = [
-    "Loading satellite imagery",
-    "Processing optical bands",
-    "Processing SAR data",
-    "Detecting canopy",
-    "Estimating biomass",
-    "Detecting temporal change",
+    "Satellite imagery acquisition",
+    "Optical preprocessing",
+    "SAR preprocessing",
+    "Optical + SAR fusion",
+    "Canopy segmentation",
+    "Tree enumeration",
+    "Biomass estimation",
+    "Temporal change detection",
 ]
-LAYER_META = [
-    ("rgb", "RGB", True, "Simulated optical composite"),
-    ("ndvi", "NDVI", False, "Vegetation index lookalike"),
-    ("sar", "SAR", False, "C-band backscatter lookalike"),
-    ("canopy", "Canopy", True, "Crown cover mask"),
-    ("biomass", "Biomass", False, "AGB intensity"),
-    ("degradation", "Degradation", False, "Disturbance candidates"),
-]
+MAP_PRODUCTS = ["RGB", "NDVI", "SAR", "CANOPY", "BIOMASS", "DEGRADATION"]
+PRODUCT_KEY = {
+    "RGB": "rgb",
+    "NDVI": "ndvi",
+    "SAR": "sar",
+    "CANOPY": "canopy",
+    "BIOMASS": "biomass",
+    "DEGRADATION": "degradation",
+}
 
 
 def _fractal_noise(h: int, w: int, seed: int, octaves: int = 6) -> np.ndarray:
@@ -155,15 +218,15 @@ def generate_layers(seed: int) -> dict[str, np.ndarray]:
 
     canopy_mask = (canopy > 0.46).astype(np.float32)
     biomass = np.clip(canopy * (0.55 + 0.45 * ndvi), 0, 1)
-    degradation = np.clip((disturbance - 0.58) * 2.4 * (1.0 - river), 0, 1)
-    degradation = degradation * (canopy > 0.22).astype(np.float32)
+    degradation = np.clip((disturbance - 0.52) * 2.2 * (1.0 - river), 0, 1)
+    degradation = degradation * (canopy > 0.18).astype(np.float32)
 
     speckle = np.random.default_rng(seed + 7).normal(0, 0.08, (h, w)).astype(np.float32)
     sar = _norm(0.7 * elev + 0.2 * texture + speckle)
 
-    r = np.clip(40 + 70 * (1 - ndvi) + 30 * disturbance + 18 * texture, 0, 255)
-    g = np.clip(28 + 150 * ndvi + 20 * canopy - 25 * river, 0, 255)
-    b = np.clip(18 + 40 * (1 - ndvi) + 90 * river + 12 * moisture, 0, 255)
+    r = np.clip(38 + 72 * (1 - ndvi) + 28 * disturbance + 16 * texture, 0, 255)
+    g = np.clip(26 + 155 * ndvi + 18 * canopy - 28 * river, 0, 255)
+    b = np.clip(16 + 38 * (1 - ndvi) + 95 * river + 10 * moisture, 0, 255)
     rgb = np.stack([r, g, b], axis=-1).astype(np.uint8)
 
     ndvi_rgb = _colormap(
@@ -198,11 +261,11 @@ def generate_layers(seed: int) -> dict[str, np.ndarray]:
     deg_rgb = _colormap(
         degradation,
         [
-            (0.0, (12, 18, 14)),
-            (0.25, (80, 40, 10)),
-            (0.5, (200, 80, 20)),
-            (0.78, (220, 30, 40)),
-            (1.0, (255, 220, 180)),
+            (0.0, (10, 18, 16)),
+            (0.22, (40, 90, 40)),
+            (0.45, (230, 190, 50)),
+            (0.68, (230, 110, 30)),
+            (1.0, (190, 20, 30)),
         ],
     )
     return {
@@ -219,35 +282,74 @@ def generate_layers(seed: int) -> dict[str, np.ndarray]:
     }
 
 
-def blend_layers(layers: dict[str, np.ndarray], active: list[str]) -> np.ndarray:
-    order = ["rgb", "ndvi", "sar", "canopy", "biomass", "degradation"]
-    selected = [k for k in order if k in active]
-    if not selected:
-        return layers["rgb"]
-    base_key = selected[0]
-    acc = layers[base_key].astype(np.float32)
-    alphas = {
-        "ndvi": 0.55,
-        "sar": 0.50,
-        "canopy": 0.42,
-        "biomass": 0.48,
-        "degradation": 0.40,
-        "rgb": 0.50,
-    }
-    for key in selected[1:]:
-        overlay = layers[key].astype(np.float32)
-        if key in ("canopy", "degradation"):
-            strength = layers["canopy_mask" if key == "canopy" else "degradation_raw"]
-            strength = np.clip(strength, 0, 1)[..., None]
-            a = alphas[key] * (0.25 + 0.75 * strength)
-            acc = (1.0 - a) * acc + a * overlay
-        else:
-            a = alphas.get(key, 0.45)
-            acc = (1.0 - a) * acc + a * overlay
-    return np.clip(acc, 0, 255).astype(np.uint8)
+def blend_product(layers: dict[str, np.ndarray], product: str, show_degradation: bool) -> np.ndarray:
+    base = layers[PRODUCT_KEY[product]].astype(np.float32)
+    if show_degradation and product != "DEGRADATION":
+        deg = layers["degradation_raw"][..., None]
+        overlay = layers["degradation"].astype(np.float32)
+        a = np.clip(deg * 0.72, 0, 0.72)
+        base = (1.0 - a) * base + a * overlay
+    return np.clip(base, 0, 255).astype(np.uint8)
 
 
-def annotate_map(rgb: np.ndarray, bbox: list[float], title: str, legend: bool = True) -> Image.Image:
+@st.cache_data(show_spinner=False)
+def sample_trees(seed: int, n: int = 110) -> list[dict[str, Any]]:
+    layers = generate_layers(seed)
+    mask = layers["canopy_mask"]
+    deg = layers["degradation_raw"]
+    bio = layers["biomass_raw"]
+    rng = np.random.default_rng(seed + 99)
+    ys, xs = np.where(mask > 0.55)
+    if len(xs) == 0:
+        return []
+    pick = rng.choice(len(xs), size=min(n, len(xs)), replace=False)
+    trees = []
+    for i, k in enumerate(pick, start=1):
+        x, y = int(xs[k]), int(ys[k])
+        rw = int(7 + 11 * mask[y, x] + rng.uniform(-1.5, 1.5))
+        rh = int(6 + 9 * mask[y, x] + rng.uniform(-1.2, 1.2))
+        area = round(float(np.pi * rw * rh * 0.42 + rng.uniform(8, 18)), 1)
+        trees.append(
+            {
+                "tree_id": f"T-{i:04d}",
+                "x": x,
+                "y": y,
+                "rw": max(5, rw),
+                "rh": max(4, rh),
+                "crown_area": area,
+                "canopy_density": round(float(0.45 + 0.5 * mask[y, x]), 3),
+                "biomass_estimate": round(float(80 + 180 * bio[y, x]), 1),
+                "degraded": bool(deg[y, x] > 0.38),
+                "deg_level": "high" if deg[y, x] > 0.62 else ("moderate" if deg[y, x] > 0.38 else "low"),
+            }
+        )
+    return trees
+
+
+def forest_boundary_pts(w: int, h: int) -> list[tuple[int, int]]:
+    rng = np.random.default_rng(4)
+    pts = []
+    for t in np.linspace(0, 2 * np.pi, 28, endpoint=False):
+        jitter = 0.04 * rng.normal()
+        rx = 0.42 + jitter
+        ry = 0.40 + 0.03 * np.sin(3 * t)
+        x = int(w * (0.50 + rx * np.cos(t) * 0.92))
+        y = int(h * (0.50 + ry * np.sin(t) * 0.88))
+        pts.append((max(24, min(w - 24, x)), max(36, min(h - 48, y))))
+    return pts
+
+
+def compose_map(
+    rgb: np.ndarray,
+    bbox: list[float],
+    title: str,
+    trees: list[dict[str, Any]],
+    *,
+    show_crowns: bool,
+    show_centroids: bool,
+    show_boundary: bool,
+    analyzed: bool,
+) -> Image.Image:
     img = _to_image(rgb).convert("RGBA")
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -257,104 +359,78 @@ def annotate_map(rgb: np.ndarray, bbox: list[float], title: str, legend: bool = 
     for i in range(1, 5):
         x = int(w * i / 5)
         y = int(h * i / 5)
-        draw.line([(x, 28), (x, h - 44)], fill=(255, 255, 255, 32), width=1)
-        draw.line([(18, y), (w - 18, y)], fill=(255, 255, 255, 32), width=1)
+        draw.line([(x, 30), (x, h - 46)], fill=(255, 255, 255, 28), width=1)
+        draw.line([(18, y), (w - 18, y)], fill=(255, 255, 255, 28), width=1)
         lon = west + (east - west) * i / 5
         lat = north - (north - south) * i / 5
-        draw.text((x + 6, 32), f"{lon:.2f}°", fill=(236, 242, 232, 190))
-        draw.text((22, y + 4), f"{lat:.2f}°", fill=(236, 242, 232, 190))
+        draw.text((x + 6, 34), f"{lon:.2f}°", fill=(220, 230, 226, 180))
+        draw.text((22, y + 4), f"{lat:.2f}°", fill=(220, 230, 226, 180))
 
-    draw.rounded_rectangle([1, 1, w - 2, h - 2], radius=10, outline=(212, 180, 90, 150), width=2)
-    draw.rectangle([0, 0, w, 26], fill=(8, 20, 14, 210))
-    draw.text((14, 6), title.upper(), fill=(232, 214, 140, 240))
-    draw.rectangle([0, h - 38, w, h], fill=(8, 20, 14, 220))
-    draw.text((14, h - 26), "AOI  ·  DEMO TILE  ·  EPSG:4326", fill=(214, 226, 216, 230))
-    draw.text((w - 158, h - 26), "10 m GSD (illustrative)", fill=(176, 196, 180, 210))
+    if show_boundary:
+        pts = forest_boundary_pts(w, h)
+        draw.line(pts + [pts[0]], fill=(90, 210, 255, 210), width=3)
 
-    if legend:
-        lx, ly = w - 168, h - 132
-        draw.rounded_rectangle([lx, ly, w - 16, h - 50], radius=8, fill=(8, 18, 12, 200), outline=(201, 162, 39, 90))
-        draw.text((lx + 12, ly + 8), "LEGEND", fill=(212, 180, 90, 230))
-        swatches = [
-            ((70, 160, 80), "Canopy"),
-            ((220, 70, 50), "Degradation"),
-            ((40, 90, 150), "Water / low"),
-        ]
-        for i, (color, label) in enumerate(swatches):
-            yy = ly + 30 + i * 16
-            draw.rectangle([lx + 12, yy, lx + 26, yy + 10], fill=color + (220,))
-            draw.text((lx + 34, yy - 2), label, fill=(220, 230, 220, 220))
+    if analyzed:
+        for t in trees:
+            x, y, rw, rh = t["x"], t["y"], t["rw"], t["rh"]
+            if y < 34 or y > h - 50 or x < 20 or x > w - 20:
+                continue
+            if show_crowns:
+                color = (232, 92, 64, 200) if t["degraded"] else (120, 230, 150, 210)
+                fill = (232, 92, 64, 28) if t["degraded"] else (90, 200, 120, 36)
+                draw.ellipse([x - rw, y - rh, x + rw, y + rh], outline=color, fill=fill, width=2)
+            if show_centroids:
+                draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(255, 230, 120, 230))
+
+    draw.rounded_rectangle([1, 1, w - 2, h - 2], radius=10, outline=(62, 207, 142, 140), width=2)
+    draw.rectangle([0, 0, w, 28], fill=(6, 12, 16, 220))
+    draw.text((14, 7), f"{title.upper()}  ·  SYNTHETIC AOI", fill=(180, 255, 210, 240))
+    draw.rectangle([0, h - 40, w, h], fill=(6, 12, 16, 230))
+    draw.text((14, h - 28), "DEMO TILE  ·  EPSG:4326  ·  prototype detections", fill=(200, 214, 208, 230))
+    draw.text((w - 168, h - 28), "10 m GSD (illustrative)", fill=(150, 170, 164, 210))
+
+    lx, ly = 16, h - 128
+    draw.rounded_rectangle([lx, ly, lx + 188, h - 50], radius=8, fill=(6, 12, 16, 210), outline=(62, 207, 142, 80))
+    draw.text((lx + 12, ly + 8), "LEGEND  ·  DEMO", fill=(62, 207, 142, 230))
+    draw.ellipse([lx + 14, ly + 32, lx + 20, ly + 38], fill=(255, 230, 120, 230))
+    draw.text((lx + 28, ly + 28), "Tree centroid", fill=(220, 230, 224, 220))
+    draw.rectangle([lx + 12, ly + 50, lx + 22, ly + 60], outline=(120, 230, 150, 230), width=2)
+    draw.text((lx + 28, ly + 48), "Canopy crown", fill=(220, 230, 224, 220))
+    draw.polygon([(lx + 12, ly + 80), (lx + 28, ly + 72), (lx + 24, ly + 86)], outline=(90, 210, 255, 230))
+    draw.text((lx + 34, ly + 70), "Forest boundary", fill=(220, 230, 224, 220))
 
     return Image.alpha_composite(img, overlay).convert("RGB").filter(ImageFilter.SMOOTH)
 
 
-def draw_detections(base: Image.Image, layers: dict[str, np.ndarray], seed: int) -> Image.Image:
-    rng = np.random.default_rng(seed + 99)
-    mask = layers["canopy_mask"]
-    deg = layers["degradation_raw"]
-    ys, xs = np.where(mask > 0.55)
-    img = base.convert("RGBA")
-    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(layer)
-    if len(xs) == 0:
-        return base
-    n = min(90, len(xs))
-    pick = rng.choice(len(xs), size=n, replace=False)
-    for k in pick:
-        x, y = int(xs[k]), int(ys[k])
-        if y > img.size[1] - 50 or y < 30 or x < 24 or x > img.size[0] - 24:
-            continue
-        rw = int(6 + 10 * mask[y, x])
-        rh = int(5 + 8 * mask[y, x])
-        disturbed = deg[y, x] > 0.35
-        color = (232, 92, 64, 200) if disturbed else (110, 230, 140, 210)
-        draw.ellipse([x - rw, y - rh, x + rw, y + rh], outline=color, width=2)
-    return Image.alpha_composite(img, layer).convert("RGB")
-
-
-def sample_chart_frame(ndvi: np.ndarray, biomass: np.ndarray, bbox: list[float]) -> pd.DataFrame:
-    step_y, step_x = 18, 22
-    rows = []
-    h, w = ndvi.shape
+def pixel_to_lonlat(x: int, y: int, bbox: list[float]) -> tuple[float, float]:
     west, south, east, north = bbox
-    for i in range(0, h, step_y):
-        for j in range(0, w, step_x):
-            rows.append(
-                {
-                    "lon": west + (east - west) * (j / w),
-                    "lat": north - (north - south) * (i / h),
-                    "NDVI": float(ndvi[i, j]),
-                    "AGB_index": float(biomass[i, j]),
-                }
-            )
-    return pd.DataFrame(rows)
+    lon = west + (east - west) * (x / MAP_W)
+    lat = north - (north - south) * (y / MAP_H)
+    return lon, lat
 
 
-def build_geojson(region_name: str, meta: dict[str, Any]) -> str:
-    west, south, east, north = meta["bbox"]
-    rng = np.random.default_rng(meta["seed"] + 3)
+def build_geojson(region_name: str, meta: dict[str, Any], trees: list[dict[str, Any]], bbox: list[float]) -> str:
     features = []
-    for i in range(12):
-        cx = float(rng.uniform(west + 0.02, east - 0.02))
-        cy = float(rng.uniform(south + 0.02, north - 0.02))
-        dx = float(rng.uniform(0.004, 0.012))
-        dy = float(rng.uniform(0.003, 0.010))
+    for t in trees[:36]:
+        lon, lat = pixel_to_lonlat(t["x"], t["y"], bbox)
+        dx = 0.0018 + t["rw"] * 0.00012
+        dy = 0.0015 + t["rh"] * 0.00012
         ring = [
-            [cx - dx, cy - dy],
-            [cx + dx, cy - dy * 0.6],
-            [cx + dx * 0.8, cy + dy],
-            [cx - dx * 0.7, cy + dy * 0.8],
-            [cx - dx, cy - dy],
+            [lon - dx, lat - dy],
+            [lon + dx, lat - dy * 0.55],
+            [lon + dx * 0.85, lat + dy],
+            [lon - dx * 0.7, lat + dy * 0.75],
+            [lon - dx, lat - dy],
         ]
         features.append(
             {
                 "type": "Feature",
                 "properties": {
-                    "id": f"canopy-{i + 1:02d}",
+                    "tree_id": t["tree_id"],
+                    "crown_area": t["crown_area"],
+                    "canopy_density": t["canopy_density"],
+                    "biomass_estimate": t["biomass_estimate"],
                     "region": region_name,
-                    "class": "tree_crown_cluster",
-                    "ndvi_mean": round(float(rng.uniform(0.52, 0.86)), 3),
-                    "agb_t_ha": round(float(rng.uniform(90, 240)), 1),
                     "source": "SylvaSense prototype (synthetic)",
                 },
                 "geometry": {"type": "Polygon", "coordinates": [ring]},
@@ -371,110 +447,70 @@ def build_geojson(region_name: str, meta: dict[str, Any]) -> str:
     )
 
 
+def sample_chart_frame(ndvi: np.ndarray, biomass: np.ndarray, bbox: list[float]) -> pd.DataFrame:
+    rows = []
+    h, w = ndvi.shape
+    west, south, east, north = bbox
+    for i in range(0, h, 20):
+        for j in range(0, w, 24):
+            rows.append(
+                {
+                    "lon": west + (east - west) * (j / w),
+                    "lat": north - (north - south) * (i / h),
+                    "NDVI": float(ndvi[i, j]),
+                    "AGB_index": float(biomass[i, j]),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 CSS = """
 <style>
 .stApp {
     background:
-        radial-gradient(900px 420px at 0% 0%, rgba(61, 140, 86, 0.16), transparent 55%),
-        radial-gradient(700px 380px at 100% 0%, rgba(212, 180, 90, 0.07), transparent 50%),
-        #08140f;
+        radial-gradient(900px 480px at 0% -10%, rgba(46, 160, 120, 0.16), transparent 50%),
+        radial-gradient(800px 400px at 100% 0%, rgba(40, 90, 160, 0.12), transparent 46%),
+        #070c10;
 }
-[data-testid="stHeader"] { background: rgba(8, 20, 15, 0.85); }
+[data-testid="stHeader"] { background: rgba(7, 12, 16, 0.88); }
 [data-testid="stToolbar"] { visibility: hidden; }
 
-.hero {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 1.5rem;
-    padding: 0.2rem 0 1rem 0;
-    border-bottom: 1px solid rgba(212, 180, 90, 0.22);
-    margin-bottom: 1.1rem;
-}
-.kicker {
-    letter-spacing: 0.34em;
-    font-size: 0.72rem;
-    color: #d4b45a;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-.title {
-    font-family: Palatino, "Palatino Linotype", Georgia, serif;
-    font-size: 2.7rem;
-    letter-spacing: 0.12em;
-    color: #f4f7f2;
-    margin: 0.15rem 0 0.15rem 0;
-    line-height: 1;
-}
-.subtitle {
-    color: #a9c0b0;
-    font-style: italic;
-    font-size: 1.05rem;
-    margin: 0;
-}
-.badge {
-    display: inline-block;
-    margin-top: 0.55rem;
-    padding: 0.2rem 0.72rem;
-    border: 1px solid rgba(212, 180, 90, 0.5);
-    border-radius: 999px;
-    color: #ead79a;
-    font-size: 0.72rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-.hero-note {
-    max-width: 280px;
-    color: #9fb3a6;
-    font-size: 0.82rem;
-    line-height: 1.45;
-    background: rgba(18, 38, 27, 0.7);
-    border: 1px solid rgba(125, 180, 140, 0.18);
-    border-radius: 14px;
-    padding: 0.85rem 1rem;
-}
-.section-label {
-    font-size: 0.78rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #d4b45a;
-    margin: 0.3rem 0 0.7rem 0;
-}
-.scene-card {
-    background: rgba(14, 32, 22, 0.78);
-    border: 1px solid rgba(125, 180, 140, 0.18);
-    border-radius: 16px;
-    padding: 1rem 1rem 0.85rem 1rem;
-}
-.scene-k { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: #8fa898; }
-.scene-v { margin: 0.2rem 0 0.85rem 0; color: #e8f0ea; font-size: 0.95rem; }
-.step-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.2rem 0 1rem 0; }
-.step {
-    font-size: 0.72rem;
-    padding: 0.28rem 0.55rem;
-    border-radius: 999px;
-    border: 1px solid rgba(125, 180, 140, 0.22);
-    color: #9fb3a6;
-    background: rgba(12, 28, 20, 0.6);
-}
-.step.done { color: #d8f0d8; border-color: rgba(80, 170, 110, 0.55); background: rgba(40, 90, 60, 0.35); }
-.step.active { color: #1a1408; border-color: #d4b45a; background: #d4b45a; }
-
+.hero { display:flex; justify-content:space-between; gap:1.5rem; align-items:flex-end;
+    padding:0.15rem 0 1.05rem 0; border-bottom:1px solid rgba(62,207,142,0.18); margin-bottom:1rem; }
+.kicker { letter-spacing:0.32em; font-size:0.7rem; color:#7ee0b0; text-transform:uppercase; font-weight:600; }
+.title { font-family: Palatino, Georgia, serif; font-size:2.65rem; letter-spacing:0.14em;
+    color:#f3f7f4; margin:0.12rem 0 0.18rem 0; line-height:1; }
+.subtitle { color:#9bb0a8; font-style:italic; font-size:1.05rem; margin:0; }
+.badge { display:inline-block; margin-top:0.5rem; padding:0.22rem 0.75rem; border-radius:999px;
+    border:1px solid rgba(62,207,142,0.45); color:#b7f0d2; font-size:0.72rem; letter-spacing:0.1em; }
+.hero-note { max-width:290px; color:#9aaea6; font-size:0.8rem; line-height:1.45;
+    background:rgba(12,20,26,0.8); border:1px solid rgba(62,207,142,0.16); border-radius:14px; padding:0.85rem 1rem; }
+.section { font-size:0.74rem; letter-spacing:0.16em; text-transform:uppercase; color:#7ee0b0; margin:0.2rem 0 0.65rem 0; }
+.card { background:rgba(12,20,26,0.78); border:1px solid rgba(90,140,120,0.18); border-radius:16px; padding:1rem; }
+.muted { color:#8fa39b; font-size:0.82rem; }
+.kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:0.7rem; margin:0.2rem 0 1rem 0; }
+.kpi { background:linear-gradient(180deg, rgba(16,32,36,0.95), rgba(10,16,20,0.95));
+    border:1px solid rgba(62,207,142,0.16); border-radius:16px; padding:0.9rem 0.95rem; }
+.kpi .l { font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:#8fa39b; }
+.kpi .v { font-size:1.55rem; color:#f3f7f4; margin-top:0.28rem; font-weight:650; }
+.kpi .s { font-size:0.72rem; color:#7ee0b0; margin-top:0.18rem; }
+.pipe { display:flex; flex-direction:column; gap:0.35rem; }
+.prow { display:flex; justify-content:space-between; align-items:center;
+    background:rgba(10,16,20,0.7); border:1px solid rgba(90,140,120,0.14); border-radius:10px; padding:0.42rem 0.7rem; }
+.pst { font-size:0.68rem; letter-spacing:0.1em; padding:0.12rem 0.5rem; border-radius:999px; }
+.queued { color:#8fa39b; border:1px solid #3a4a46; }
+.processing { color:#1a1408; background:#d4b45a; }
+.complete { color:#062014; background:#3ecf8e; }
+.health-num { font-size:3.2rem; color:#f3f7f4; line-height:1; font-weight:700; }
+.health-st { letter-spacing:0.18em; font-size:0.9rem; color:#3ecf8e; margin-top:0.3rem; }
+.ind { display:flex; justify-content:space-between; font-size:0.85rem; padding:0.35rem 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+.arch { font-family: ui-monospace, Menlo, monospace; font-size:0.86rem; line-height:1.55; color:#c5d6ce; }
 div[data-testid="stMetric"] {
-    background: linear-gradient(180deg, rgba(22, 48, 34, 0.95), rgba(12, 28, 20, 0.95));
-    border: 1px solid rgba(125, 180, 140, 0.2);
-    padding: 0.85rem 0.95rem;
-    border-radius: 16px;
+    background:linear-gradient(180deg, rgba(16,32,36,0.95), rgba(10,16,20,0.95));
+    border:1px solid rgba(62,207,142,0.16); padding:0.85rem 0.95rem; border-radius:16px;
 }
-div[data-testid="stMetric"] label { color: #9fb3a6 !important; }
-[data-testid="stImage"] img { border-radius: 14px; }
-.stTabs [data-baseweb="tab-list"] { gap: 0.4rem; }
-.stTabs [data-baseweb="tab"] {
-    background: rgba(18, 38, 27, 0.6);
-    border-radius: 10px;
-    padding: 0.4rem 0.9rem;
-}
-footer { visibility: hidden; }
+[data-testid="stImage"] img { border-radius:14px; }
+footer { visibility:hidden; }
 </style>
 """
 
@@ -484,22 +520,77 @@ def init_state() -> None:
         st.session_state.analyzed_regions = []
     if "pipeline_step" not in st.session_state:
         st.session_state.pipeline_step = -1
-    if "pending_result_layers" not in st.session_state:
-        st.session_state.pending_result_layers = False
-    if st.session_state.pending_result_layers:
-        st.session_state.layer_canopy = True
-        st.session_state.layer_degradation = True
-        st.session_state.pending_result_layers = False
+    if "analysis_complete_flag" not in st.session_state:
+        st.session_state.analysis_complete_flag = False
+    if st.session_state.get("pending_deg_overlay"):
+        st.session_state.ov_deg = True
+        st.session_state.pending_deg_overlay = False
 
 
 def altair_style(chart: alt.Chart) -> alt.Chart:
     return (
         chart.configure(background="transparent")
         .configure_view(strokeWidth=0, fill="transparent")
-        .configure_axis(labelColor="#c5d4c8", titleColor="#d4b45a", gridColor="#1d3328")
+        .configure_axis(labelColor="#c5d4c8", titleColor="#7ee0b0", gridColor="#1a2a28")
         .configure_title(color="#e8f0ea", fontSize=14, fontWeight=500, anchor="start")
-        .configure_legend(labelColor="#c5d4c8", titleColor="#d4b45a")
+        .configure_legend(labelColor="#c5d4c8", titleColor="#7ee0b0")
     )
+
+
+def kpi_html(done: bool, meta: dict[str, Any]) -> str:
+    if done:
+        vals = [
+            ("TREES DETECTED", f"{meta['trees']:,}", "prototype instances"),
+            ("CANOPY DENSITY", f"{meta['canopy_pct']:.1f}%", "fractional cover"),
+            ("AGB", f"{meta['agb']:.1f} t/ha", "demo estimate"),
+            ("CARBON STOCK", f"{meta['carbon']:.1f} tC/ha", "AGB × 0.5"),
+            ("CANOPY LOSS", f"{meta['loss_pct']:.1f}%", "2024–2026 demo"),
+        ]
+    else:
+        vals = [
+            ("TREES DETECTED", "—", "awaiting analysis"),
+            ("CANOPY DENSITY", "—", ""),
+            ("AGB", "—", "t/ha"),
+            ("CARBON STOCK", "—", "tC/ha"),
+            ("CANOPY LOSS", "—", "%"),
+        ]
+    cells = "".join(
+        f'<div class="kpi"><div class="l">{a}</div><div class="v">{b}</div><div class="s">{c}</div></div>'
+        for a, b, c in vals
+    )
+    return f'<div class="kpi-row">{cells}</div>'
+
+
+def pipeline_html(current: int, done: bool) -> str:
+    rows = []
+    for i, name in enumerate(ANALYSIS_STEPS):
+        if done or current > i:
+            stt, cls = "COMPLETE", "complete"
+        elif current == i:
+            stt, cls = "PROCESSING", "processing"
+        else:
+            stt, cls = "QUEUED", "queued"
+        rows.append(
+            f'<div class="prow"><span>{i + 1:02d}  {name}</span><span class="pst {cls}">{stt}</span></div>'
+        )
+    extra = ""
+    if done:
+        extra = '<div class="prow"><span><b>ANALYSIS COMPLETE</b></span><span class="pst complete">READY</span></div>'
+    return f'<div class="pipe">{"".join(rows)}{extra}</div>'
+
+
+def run_pipeline() -> None:
+    board = st.empty()
+    bar = st.progress(0, text="Initialising prototype pipeline…")
+    for i, step in enumerate(ANALYSIS_STEPS):
+        st.session_state.pipeline_step = i
+        board.markdown(pipeline_html(i, False), unsafe_allow_html=True)
+        bar.progress((i + 1) / len(ANALYSIS_STEPS), text=f"{step} — PROCESSING")
+        time.sleep(0.38)
+    board.markdown(pipeline_html(len(ANALYSIS_STEPS), True), unsafe_allow_html=True)
+    bar.progress(1.0, text="ANALYSIS COMPLETE")
+    st.success("ANALYSIS COMPLETE — prototype products ready (demo mode).")
+    time.sleep(0.3)
 
 
 def main() -> None:
@@ -510,10 +601,10 @@ def main() -> None:
         """
         <div class="hero">
           <div>
-            <div class="kicker">ORION-PS-03 · Forest Intelligence</div>
+            <div class="kicker">ORION-PS-03 · Earth Observation</div>
             <div class="title">SYLVASENSE</div>
-            <p class="subtitle">“Satellite-Powered Forest Intelligence”</p>
-            <span class="badge">Prototype / Demo Mode</span>
+            <p class="subtitle">Satellite-Powered Forest Intelligence</p>
+            <span class="badge">PROTOTYPE • MULTI-SPECTRAL + SAR</span>
           </div>
           <div class="hero-note">
             Synthetic optical + SAR-like rasters for demonstration.
@@ -525,187 +616,286 @@ def main() -> None:
     )
 
     with st.sidebar:
-        st.markdown('<div class="section-label">Mission control</div>', unsafe_allow_html=True)
-        region = st.selectbox("Forest Region", list(REGIONS.keys()), key="region")
+        st.markdown('<div class="section">Target Forest</div>', unsafe_allow_html=True)
+        region = st.selectbox("Forest region", list(REGIONS.keys()), key="region")
         meta = REGIONS[region]
+        west, south, east, north = meta["bbox"]
+        c_lat = round((south + north) / 2, 4)
+        c_lon = round((west + east) / 2, 4)
+        if st.session_state.get("synced_region") != region:
+            st.session_state.aoi_lat = c_lat
+            st.session_state.aoi_lon = c_lon
+            st.session_state.aoi_name = region.split("—")[0].strip()
+            st.session_state.synced_region = region
 
-        st.markdown('<div class="section-label">Layers</div>', unsafe_allow_html=True)
-        active_layers: list[str] = []
-        cols = st.columns(2)
-        for i, (key, label, default, help_text) in enumerate(LAYER_META):
-            with cols[i % 2]:
-                on = st.toggle(label, value=default, key=f"layer_{key}", help=help_text)
-            if on:
-                active_layers.append(key)
+        lat = st.number_input("Latitude", format="%.4f", key="aoi_lat")
+        lon = st.number_input("Longitude", format="%.4f", key="aoi_lon")
+        aoi = st.text_input("Area of Interest", key="aoi_name")
+        st.caption("Defaults to the selected region centroid if left unchanged.")
+
+        st.markdown('<div class="section">Map product</div>', unsafe_allow_html=True)
+        product = st.radio("Layer", MAP_PRODUCTS, index=0, key="map_product", horizontal=False)
+        st.caption("Switch the central raster. Overlays remain independent.")
+        show_crowns = st.toggle("Tree crowns", value=True, key="ov_crowns")
+        show_centroids = st.toggle("Tree centroids", value=True, key="ov_cent")
+        show_boundary = st.toggle("Forest boundary", value=True, key="ov_bound")
+        show_deg = st.toggle("Degradation overlay", value=False, key="ov_deg")
 
         st.divider()
-        run = st.button("Run Analysis", type="primary", use_container_width=True)
+        analyze = st.button("Analyze Target Forest", type="primary", use_container_width=True)
+        run = st.button("Run Analysis", use_container_width=True)
         reset = st.button("Reset Demo", use_container_width=True)
         if reset:
             st.session_state.analyzed_regions = []
             st.session_state.pipeline_step = -1
+            st.session_state.analysis_complete_flag = False
             st.rerun()
-
         st.caption(meta["note"])
         st.caption("Prototype / Demo Mode · local synthetic tiles")
 
-    if run:
-        progress = st.progress(0, text="Starting pipeline…")
-        status_box = st.empty()
-        for i, step in enumerate(ANALYSIS_STEPS):
-            st.session_state.pipeline_step = i
-            progress.progress((i + 1) / (len(ANALYSIS_STEPS) + 1), text=f"{step}…")
-            status_box.info(f"**Pipeline:** {step}")
-            time.sleep(0.42)
-        progress.progress(1.0, text="Analysis complete")
-        status_box.success("Analysis complete — demo products ready")
-        time.sleep(0.35)
+    bbox = [
+        float(lon) - (east - west) / 2,
+        float(lat) - (north - south) / 2,
+        float(lon) + (east - west) / 2,
+        float(lat) + (north - south) / 2,
+    ]
+    analysis_key = f"{region}|{round(float(lat), 4)}|{round(float(lon), 4)}"
+
+    if analyze or run:
+        run_pipeline()
+        if analysis_key not in st.session_state.analyzed_regions:
+            st.session_state.analyzed_regions.append(analysis_key)
         st.session_state.pipeline_step = len(ANALYSIS_STEPS)
-        if region not in st.session_state.analyzed_regions:
-            st.session_state.analyzed_regions.append(region)
-        st.session_state.pending_result_layers = True
+        st.session_state.analysis_complete_flag = True
+        st.session_state.pending_deg_overlay = True
         st.rerun()
 
-    done = region in st.session_state.analyzed_regions
+    done = analysis_key in st.session_state.analyzed_regions
     layers = generate_layers(int(meta["seed"]))
-    composite = blend_layers(layers, active_layers)
-    map_title = region.split("—")[0].strip()
-    map_img = annotate_map(composite, meta["bbox"], map_title)
-    display = draw_detections(map_img, layers, int(meta["seed"])) if done else map_img
+    trees = sample_trees(int(meta["seed"]))
+    raster = blend_product(layers, product, show_deg and done)
+    title = aoi or region.split("—")[0].strip()
+    display = compose_map(
+        raster,
+        bbox,
+        title,
+        trees if done else [],
+        show_crowns=show_crowns and done,
+        show_centroids=show_centroids and done,
+        show_boundary=show_boundary,
+        analyzed=done,
+    )
 
-    steps_html = ['<div class="step-row">']
-    for i, step in enumerate(ANALYSIS_STEPS + ["Analysis complete"]):
-        cls = "step"
-        if done or st.session_state.pipeline_step >= i:
-            cls += " done"
-        if not done and st.session_state.pipeline_step == i:
-            cls = "step active"
-        steps_html.append(f'<span class="{cls}">{i + 1}. {step}</span>')
-    steps_html.append("</div>")
-    st.markdown("".join(steps_html), unsafe_allow_html=True)
+    st.markdown(kpi_html(done, meta), unsafe_allow_html=True)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    if done:
-        c1.metric("Trees Detected", f"{meta['trees']:,}", "demo crown objects")
-        c2.metric("Canopy Density", f"{meta['canopy_pct']:.1f}%", "fractional cover")
-        c3.metric("Estimated AGB", f"{meta['agb']:.1f} t/ha", "allometric proxy")
-        c4.metric("Carbon Stock", f"{meta['carbon']:.1f} tC/ha", "AGB × 0.5")
-        c5.metric("Canopy Loss", f"{meta['loss_pct']:.1f}%", "temporal change (demo)")
-    else:
-        c1.metric("Trees Detected", "—", "run analysis")
-        c2.metric("Canopy Density", "—")
-        c3.metric("Estimated AGB", "—", "t/ha")
-        c4.metric("Carbon Stock", "—", "tC/ha")
-        c5.metric("Canopy Loss", "—", "%")
-
-    st.write("")
-    map_col, info_col = st.columns([1.7, 0.5], gap="large")
-    with map_col:
-        st.markdown('<div class="section-label">Forest intelligence map</div>', unsafe_allow_html=True)
+    left, right = st.columns([1.55, 0.45], gap="large")
+    with left:
+        st.markdown('<div class="section">Forest map / canopy view</div>', unsafe_allow_html=True)
         st.image(display, use_container_width=True)
-        if done:
-            st.caption(
-                "Green ellipses = canopy detections on high-cover pixels. "
-                "Red ellipses = disturbance candidates. Synthetic demo overlay."
-            )
-        else:
-            st.caption("Select layers, then click **Run Analysis** to generate canopy and change products.")
-
-    with info_col:
-        west, south, east, north = meta["bbox"]
-        layer_txt = ", ".join(k.upper() for k in active_layers) if active_layers else "RGB (fallback)"
-        status_txt = "Products ready" if done else "Awaiting analysis"
-        st.markdown(
-            f"""
-            <div class="scene-card">
-              <div class="scene-k">Region</div>
-              <div class="scene-v">{region}</div>
-              <div class="scene-k">Bounding box</div>
-              <div class="scene-v">{south:.3f}–{north:.3f}°N<br/>{west:.3f}–{east:.3f}°E</div>
-              <div class="scene-k">Active layers</div>
-              <div class="scene-v">{layer_txt}</div>
-              <div class="scene-k">Status</div>
-              <div class="scene-v">{status_txt}<br/><span style="color:#d4b45a">Prototype / Demo Mode</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.caption(
+            f"Active product: **{product}** · prototype / demo detections · not live satellite inference."
         )
-        st.write("")
+    with right:
+        st.markdown('<div class="section">Analysis pipeline</div>', unsafe_allow_html=True)
+        step = st.session_state.pipeline_step
+        st.markdown(pipeline_html(step if not done else len(ANALYSIS_STEPS), done), unsafe_allow_html=True)
+        if done:
+            st.success("ANALYSIS COMPLETE")
+        else:
+            st.info("Click **Analyze Target Forest** to run the prototype pipeline.")
+
+        st.markdown('<div class="section">Export</div>', unsafe_allow_html=True)
         st.download_button(
-            label="Download GeoJSON",
-            data=build_geojson(region, meta),
+            label="Export Canopy GeoJSON",
+            data=build_geojson(region, meta, trees, bbox),
             file_name="sylvasense_canopy_demo.geojson",
             mime="application/geo+json",
             use_container_width=True,
             disabled=not done,
-            help="Sample canopy polygons for this demo AOI (not live model output).",
+            help="Demo canopy polygons with tree_id, crown_area, canopy_density, biomass_estimate.",
         )
-        if not done:
-            st.caption("Enabled after analysis completes.")
-        else:
-            st.caption("Valid FeatureCollection of synthetic crown clusters.")
+        st.download_button(
+            label="Download GeoJSON",
+            data=build_geojson(region, meta, trees, bbox),
+            file_name="sylvasense_canopy.geojson",
+            mime="application/geo+json",
+            use_container_width=True,
+            disabled=not done,
+        )
+        st.caption("Valid GeoJSON FeatureCollection · synthetic canopy polygons.")
 
     if done:
-        tab_map, tab_charts = st.tabs(["Canopy & degradation", "NDVI analytics"])
-        with tab_map:
-            a, b = st.columns(2)
-            with a:
-                st.image(
-                    annotate_map(layers["canopy"], meta["bbox"], "Canopy detection", legend=False),
-                    caption="Canopy detection raster (demo)",
-                    use_container_width=True,
+        t1, t2 = st.columns([1.15, 0.85], gap="large")
+        with t1:
+            st.markdown('<div class="section">Tree enumeration</div>', unsafe_allow_html=True)
+            e1, e2 = st.columns(2)
+            e1.metric("Trees Detected", f"{meta['trees']:,}", "prototype / demo detections")
+            e2.metric("Detected Crown Area", f"{meta['crown_area_ha']:.1f} ha")
+            e3, e4 = st.columns(2)
+            e3.metric("Canopy Density", f"{meta['canopy_pct']:.1f}%")
+            e4.metric("Mean Crown Area", f"{meta['mean_crown_m2']:.1f} m²")
+            st.caption("● Tree centroid  ▢ Canopy crown  ▱ Forest boundary")
+            st.caption("Individual outlines on the map are a visual subset of the demo enumeration.")
+
+            st.markdown('<div class="section">Biomass & carbon intelligence</div>', unsafe_allow_html=True)
+            b1, b2, b3 = st.columns(3)
+            b1.metric("Estimated Aboveground Biomass", f"{meta['agb']:.1f} t/ha")
+            b2.metric("Carbon Stock", f"{meta['carbon']:.1f} tC/ha")
+            b3.metric("CO₂ Equivalent", f"{meta['co2e']:.1f} tCO₂e/ha")
+            st.caption("Prototype estimate — calibrated model integration planned")
+            bio_vals = layers["biomass_raw"].ravel()[::40] * meta["agb"]
+            bio_df = pd.DataFrame({"AGB (t/ha, scaled demo)": bio_vals})
+            hist = (
+                alt.Chart(bio_df)
+                .mark_bar(color="#3ecf8e")
+                .encode(
+                    x=alt.X("AGB (t/ha, scaled demo):Q", bin=alt.Bin(maxbins=24), title="AGB (t/ha)"),
+                    y=alt.Y("count()", title="Pixels (subsampled)"),
                 )
-            with b:
-                st.image(
-                    annotate_map(layers["degradation"], meta["bbox"], "Degradation", legend=False),
-                    caption="Degradation / disturbance raster (demo)",
-                    use_container_width=True,
-                )
-        with tab_charts:
-            df = sample_chart_frame(layers["ndvi_raw"], layers["biomass_raw"], meta["bbox"])
+                .properties(height=220, title="Biomass distribution — synthetic tile")
+            )
+            st.altair_chart(altair_style(hist), use_container_width=True)
+
+        with t2:
+            st.markdown('<div class="section">Forest health score</div>', unsafe_allow_html=True)
+            color = "#3ecf8e" if meta["health"] >= 80 else ("#d4b45a" if meta["health"] >= 70 else "#e07a5f")
+            st.markdown(
+                f"""
+                <div class="card">
+                  <div class="health-num">{meta['health']} <span style="font-size:1.2rem;color:#8fa39b">/ 100</span></div>
+                  <div class="health-st" style="color:{color}">{meta['health_status']}</div>
+                  <div class="muted" style="margin:0.6rem 0 0.4rem 0">Prototype indicators — not live EO scores</div>
+                  <div class="ind"><span>NDVI</span><span>{meta['ndvi_ind']:.2f}</span></div>
+                  <div class="ind"><span>Canopy Density</span><span>{meta['canopy_pct']:.1f}%</span></div>
+                  <div class="ind"><span>SAR Stability</span><span>{meta['sar_stability']:.2f}</span></div>
+                  <div class="ind"><span>Canopy Loss</span><span>{meta['loss_pct']:.1f}%</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="section">Temporal canopy intelligence</div>', unsafe_allow_html=True)
+        st.caption("Temporal comparison identifies areas of canopy decline and potential forest disturbance.")
+        y1, y2, y3, m1, m2, m3 = st.columns(6)
+        y1.metric("2024 trees", f"{meta['trees_2024']:,}")
+        y2.metric("2025 trees", f"{meta['trees_2025']:,}")
+        y3.metric("2026 trees", f"{meta['trees_2026']:,}")
+        m1.metric("Canopy Loss", f"{meta['loss_pct']:.1f}%")
+        m2.metric("Tree Count Change", f"{meta['tree_delta']}")
+        m3.metric("Degradation Risk", meta["risk"])
+
+        d1, d2 = st.columns([1.2, 0.8])
+        with d1:
+            st.image(
+                compose_map(
+                    layers["degradation"],
+                    bbox,
+                    "Degradation heatmap",
+                    trees,
+                    show_crowns=False,
+                    show_centroids=False,
+                    show_boundary=True,
+                    analyzed=True,
+                ),
+                caption="Low (green) · Moderate (amber) · High (red) — synthetic disturbance field",
+                use_container_width=True,
+            )
+        with d2:
+            tl = pd.DataFrame(
+                {
+                    "Year": ["2024", "2025", "2026"],
+                    "Trees": [meta["trees_2024"], meta["trees_2025"], meta["trees_2026"]],
+                }
+            )
+            line = (
+                alt.Chart(tl)
+                .mark_line(point=True, color="#e07a5f", strokeWidth=3)
+                .encode(x="Year:N", y=alt.Y("Trees:Q", title="Tree count (demo)"))
+                .properties(height=260, title="2024 → 2025 → 2026  (prototype timeline)")
+            )
+            st.altair_chart(altair_style(line), use_container_width=True)
+            st.markdown(
+                """
+                <div class="card">
+                <div class="muted">Intensity classes</div>
+                <div class="ind"><span>Low degradation</span><span>stable canopy</span></div>
+                <div class="ind"><span>Moderate degradation</span><span>edge / thinning</span></div>
+                <div class="ind"><span>High degradation</span><span>disturbance candidate</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="section">Canopy & NDVI products</div>', unsafe_allow_html=True)
+        p1, p2 = st.columns(2)
+        with p1:
+            st.image(
+                compose_map(
+                    layers["canopy"],
+                    bbox,
+                    "Canopy regions",
+                    trees,
+                    show_crowns=True,
+                    show_centroids=True,
+                    show_boundary=True,
+                    analyzed=True,
+                ),
+                caption="Canopy regions + instance outlines (demo)",
+                use_container_width=True,
+            )
+        with p2:
+            df = sample_chart_frame(layers["ndvi_raw"], layers["biomass_raw"], bbox)
             heat = (
                 alt.Chart(df)
                 .mark_rect()
                 .encode(
                     x=alt.X("lon:Q", title="Longitude"),
                     y=alt.Y("lat:Q", title="Latitude"),
-                    color=alt.Color("NDVI:Q", scale=alt.Scale(scheme="yellowgreenblue"), title="NDVI"),
-                    tooltip=[
-                        alt.Tooltip("lon:Q", format=".3f"),
-                        alt.Tooltip("lat:Q", format=".3f"),
-                        alt.Tooltip("NDVI:Q", format=".2f"),
-                        alt.Tooltip("AGB_index:Q", format=".2f", title="AGB index"),
-                    ],
+                    color=alt.Color("NDVI:Q", scale=alt.Scale(scheme="yellowgreenblue")),
+                    tooltip=["lon:Q", "lat:Q", "NDVI:Q", "AGB_index:Q"],
                 )
-                .properties(height=320, title="Sampled NDVI field — synthetic, hover for values")
+                .properties(height=340, title="Sampled NDVI field — synthetic")
                 .interactive()
             )
-            hist = (
-                alt.Chart(pd.DataFrame({"NDVI": layers["ndvi_raw"].ravel()[::50]}))
-                .mark_bar(color="#3d9b6e")
-                .encode(
-                    x=alt.X("NDVI:Q", bin=alt.Bin(maxbins=28), title="NDVI"),
-                    y=alt.Y("count()", title="Pixels (subsampled)"),
-                )
-                .properties(height=260, title="NDVI distribution — demo tile")
-            )
             st.altair_chart(altair_style(heat), use_container_width=True)
-            st.altair_chart(altair_style(hist), use_container_width=True)
+
+    with st.expander("System Architecture"):
+        st.markdown(
+            """
+            <div class="arch">
+            Sentinel-2 Optical<br/>
+            +<br/>
+            Sentinel-1 SAR<br/>
+            ↓<br/>
+            Preprocessing<br/>
+            ↓<br/>
+            Multi-Modal Fusion<br/>
+            ↓<br/>
+            Canopy Instance Segmentation<br/>
+            ↓<br/>
+            Tree Enumeration<br/>
+            ↓<br/>
+            AGB Regression<br/>
+            ↓<br/>
+            Carbon Estimation<br/>
+            ↓<br/>
+            Temporal Change Detection<br/>
+            ↓<br/>
+            SylvaSense Dashboard
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.info("**Prototype / Demo Pipeline** — this build uses locally generated rasters and seeded detections, not live Sentinel processing.")
 
     with st.expander("About this prototype"):
         st.markdown(
             """
             **SylvaSense** is a hackathon prototype for automated forest intelligence.
 
-            This build is **demo mode only**. Map tiles, NDVI, SAR lookalikes, canopy
-            detections, AGB, carbon, and change metrics are generated locally from seeded
-            noise and region presets. They illustrate the operator workflow — region
-            select → layer fusion → analysis → GeoJSON export — and are **not** an
-            operational forest inventory.
-
-            A production system would ingest Sentinel-2 and Sentinel-1 scenes, run canopy
-            segmentation, apply regional allometry, and detect temporal loss. Those models
-            are **not executed here**.
+            Map tiles, NDVI, SAR lookalikes, canopy detections, AGB, carbon, health, and
+            change metrics are generated locally from seeded noise and region presets.
+            They illustrate the operator workflow and are **not** an operational forest inventory.
             """
         )
 
